@@ -1,23 +1,23 @@
 Description: Fan driver support VXLAN (p4)
  Fan driver setup support for vxlan interfaces.
 
-Index: iproute2-4.3.0/include/linux/if_link.h
+Index: iproute2/include/uapi/linux/if_link.h
 ===================================================================
---- iproute2-4.3.0.orig/include/linux/if_link.h
-+++ iproute2-4.3.0/include/linux/if_link.h
-@@ -392,6 +392,7 @@ enum {
- 	IFLA_VXLAN_GBP,
- 	IFLA_VXLAN_REMCSUM_NOPARTIAL,
+--- iproute2.orig/include/uapi/linux/if_link.h
++++ iproute2/include/uapi/linux/if_link.h
+@@ -511,6 +511,7 @@ enum {
  	IFLA_VXLAN_COLLECT_METADATA,
+ 	IFLA_VXLAN_LABEL,
+ 	IFLA_VXLAN_GPE,
 +	IFLA_VXLAN_FAN_MAP = 33,
  	__IFLA_VXLAN_MAX
  };
  #define IFLA_VXLAN_MAX	(__IFLA_VXLAN_MAX - 1)
-Index: iproute2-4.3.0/include/linux/if_tunnel.h
+Index: iproute2/include/uapi/linux/if_tunnel.h
 ===================================================================
---- iproute2-4.3.0.orig/include/linux/if_tunnel.h
-+++ iproute2-4.3.0/include/linux/if_tunnel.h
-@@ -145,7 +145,7 @@ enum {
+--- iproute2.orig/include/uapi/linux/if_tunnel.h
++++ iproute2/include/uapi/linux/if_tunnel.h
+@@ -170,7 +170,7 @@ enum {
  
  #define IFLA_FAN_MAX (__IFLA_FAN_MAX - 1)
  
@@ -26,10 +26,10 @@ Index: iproute2-4.3.0/include/linux/if_tunnel.h
  	__be32		underlay;
  	__be32		overlay;
  	__u16		underlay_prefix;
-Index: iproute2-4.3.0/ip/iplink_vxlan.c
+Index: iproute2/ip/iplink_vxlan.c
 ===================================================================
---- iproute2-4.3.0.orig/ip/iplink_vxlan.c
-+++ iproute2-4.3.0/ip/iplink_vxlan.c
+--- iproute2.orig/ip/iplink_vxlan.c
++++ iproute2/ip/iplink_vxlan.c
 @@ -15,7 +15,10 @@
  #include <net/if.h>
  #include <linux/ip.h>
@@ -41,8 +41,8 @@ Index: iproute2-4.3.0/ip/iplink_vxlan.c
  
  #include "rt_names.h"
  #include "utils.h"
-@@ -43,6 +46,45 @@ static void explain(void)
- 	print_explain(stderr);
+@@ -71,6 +74,45 @@ static void check_duparg(__u64 *attrs, i
+ 	duparg2(key, argv);
  }
  
 +static int fan_parse_map(int *argcp, char ***argvp, struct nlmsghdr *n)
@@ -87,18 +87,19 @@ Index: iproute2-4.3.0/ip/iplink_vxlan.c
  static int vxlan_parse_opt(struct link_util *lu, int argc, char **argv,
  			  struct nlmsghdr *n)
  {
-@@ -201,6 +243,10 @@ static int vxlan_parse_opt(struct link_u
- 			udp6zerocsumrx = 0;
- 		} else if (!matches(*argv, "gbp")) {
- 			gbp = 1;
+@@ -329,6 +371,11 @@ static int vxlan_parse_opt(struct link_u
+ 		} else if (!matches(*argv, "gpe")) {
+ 			check_duparg(&attrs, IFLA_VXLAN_GPE, *argv, *argv);
+ 			addattr_l(n, 1024, IFLA_VXLAN_GPE, NULL, 0);
 +		} else if (!matches(*argv, "fan-map")) {
++			check_duparg(&attrs, IFLA_VXLAN_FAN_MAP, *argv, *argv);
 +			NEXT_ARG();
 +			if (fan_parse_map(&argc, &argv, n))
 +				invarg("invalid fan-map", *argv);
  		} else if (matches(*argv, "help") == 0) {
  			explain();
  			return -1;
-@@ -279,6 +325,28 @@ static int vxlan_parse_opt(struct link_u
+@@ -391,6 +438,28 @@ static int vxlan_parse_opt(struct link_u
  	return 0;
  }
  
@@ -117,9 +118,9 @@ Index: iproute2-4.3.0/ip/iplink_vxlan.c
 +		p = RTA_PAYLOAD(i);
 +		m = RTA_DATA(i);
 +		fprintf(f, "%s/%d:%s/%d ",
-+			rt_addr_n2a(AF_INET, p, &m->overlay, b1, INET_ADDRSTRLEN),
++			rt_addr_n2a_r(AF_INET, p, &m->overlay, b1, INET_ADDRSTRLEN),
 +			m->overlay_prefix,
-+			rt_addr_n2a(AF_INET, p, &m->underlay, b2, INET_ADDRSTRLEN),
++			rt_addr_n2a_r(AF_INET, p, &m->underlay, b2, INET_ADDRSTRLEN),
 +			m->underlay_prefix);
 +	}
 +}
@@ -127,7 +128,7 @@ Index: iproute2-4.3.0/ip/iplink_vxlan.c
  static void vxlan_print_opt(struct link_util *lu, FILE *f, struct rtattr *tb[])
  {
  	__u32 vni;
-@@ -321,6 +389,9 @@ static void vxlan_print_opt(struct link_
+@@ -445,6 +514,9 @@ static void vxlan_print_opt(struct link_
  		}
  	}
  
@@ -136,12 +137,12 @@ Index: iproute2-4.3.0/ip/iplink_vxlan.c
 +
  	if (tb[IFLA_VXLAN_LOCAL]) {
  		__be32 addr = rta_getattr_u32(tb[IFLA_VXLAN_LOCAL]);
- 		if (addr)
-Index: iproute2-4.3.0/ip/link_iptnl.c
+ 
+Index: iproute2/ip/link_iptnl.c
 ===================================================================
---- iproute2-4.3.0.orig/ip/link_iptnl.c
-+++ iproute2-4.3.0/ip/link_iptnl.c
-@@ -49,10 +49,11 @@ static void usage(int sit)
+--- iproute2.orig/ip/link_iptnl.c
++++ iproute2/ip/link_iptnl.c
+@@ -68,10 +68,11 @@ static void usage(int sit)
  	print_usage(stderr, sit);
  	exit(-1);
  }
@@ -154,7 +155,7 @@ Index: iproute2-4.3.0/ip/link_iptnl.c
  	struct rtattr *nest;
  	char **argv = *argvp;
  	int argc = *argcp;
-@@ -61,8 +62,10 @@ static int fan_parse_map(int *argcp, cha
+@@ -80,8 +81,10 @@ static int fan_parse_map(int *argcp, cha
  	while (argc > 0) {
  		char *colon = strchr(*argv, ':');
  
@@ -166,7 +167,7 @@ Index: iproute2-4.3.0/ip/link_iptnl.c
  		*colon = '\0';
  
  		if (get_prefix(&overlay, *argv, AF_INET))
-@@ -371,7 +374,7 @@ get_failed:
+@@ -409,7 +412,7 @@ get_failed:
  static void fan_print_map(FILE *f, struct rtattr *attr)
  {
  	char b1[INET_ADDRSTRLEN], b2[INET_ADDRSTRLEN];
