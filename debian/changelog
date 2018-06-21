@@ -1,3 +1,9 @@
+iproute2 (4.15.0-2ubuntu1~xenial0+exo1) xenial; urgency=medium
+
+  * Backport for Xenial.
+
+ -- Vincent Bernat <bernat@debian.org>  Thu, 21 Jun 2018 10:42:34 +0200
+
 iproute2 (4.15.0-2ubuntu1) bionic; urgency=medium
 
   * Merge with Debian unstable. Remaining changes:
